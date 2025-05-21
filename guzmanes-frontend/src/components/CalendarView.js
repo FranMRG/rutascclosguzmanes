@@ -1,17 +1,13 @@
 // guzmanes-frontend/src/components/CalendarView.js
 import React, { useState } from 'react';
-// Importa las funciones necesarias de date-fns, si no las tienes ya (format, parseISO)
-// Aunque tu implementación actual no las usa para los días, sí son útiles para formatear la hora/fecha de las rutas
 import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale/es'; // <<-- ¡MODIFICADO AQUÍ!
+import { es } from 'date-fns/locale/es';
 
 const months = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
-// Asumo que CalendarView recibe ahora también onJoinRoute, onLeaveRoute, onDeleteRoute, y user
-// Si no las recibía, asegúrate de pasarlas desde App.js al CalendarView
 const CalendarView = ({ routes, onJoinRoute, onLeaveRoute, onDeleteRoute, user }) => {
   console.log('Routes prop in CalendarView:', routes); // DEBUG
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -81,7 +77,7 @@ const CalendarView = ({ routes, onJoinRoute, onLeaveRoute, onDeleteRoute, user }
         ))}
         {days.map((day) => {
           const dayRoutes = getRoutesForDay(day);
-          const isTodayCell = isCurrentMonth && day === today.getDate(); // Renombrado para evitar conflicto con isToday de date-fns
+          const isTodayCell = isCurrentMonth && day === today.getDate();
           return (
             <div
               key={day}
@@ -91,14 +87,34 @@ const CalendarView = ({ routes, onJoinRoute, onLeaveRoute, onDeleteRoute, user }
                 {day}
               </div>
               <div className="flex-grow overflow-y-auto mt-1 space-y-1">
-                {dayRoutes.map(route => (
-                  <div
-                    key={route.id}
-                    // Añadimos 'group' para el hover, 'cursor-pointer' para la interacción
-                    className={`text-xs p-1 mb-1 rounded relative overflow-hidden group cursor-pointer
+                {dayRoutes.map(route => {
+                  // --- MODIFICACIÓN CLAVE AQUÍ ---
+                  // Parsear participants_json a un array para cada ruta
+                  let participantsArray = [];
+                  if (route.participants_json) {
+                    try {
+                      participantsArray = JSON.parse(route.participants_json);
+                      if (!Array.isArray(participantsArray)) {
+                        participantsArray = []; // Asegurarse de que sea un array
+                      }
+                    } catch (error) {
+                      console.error("Error parsing participants_json for route:", route.id, error);
+                      participantsArray = [];
+                    }
+                  }
+                  // --- FIN MODIFICACIÓN CLAVE ---
+
+                  // Verificar si el usuario actual está en la ruta
+                  // Asegúrate de que `user` y `user.username` existen antes de usar `.includes()`
+                  const isUserParticipant = user && user.username && participantsArray.includes(user.username);
+
+                  return (
+                    <div
+                      key={route.id}
+                      className={`text-xs p-1 mb-1 rounded relative overflow-hidden group cursor-pointer
                                 ${route.type === 'carretera' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}
-                    title={`${route.name} (${route.time} - ${route.distance}km - ${route.elevation}m)`} // Tooltip al pasar el ratón
-                    onClick={() => { // Click para mostrar detalles completos en un alert
+                      title={`${route.name} (${route.time} - ${route.distance}km - ${route.elevation}m)`}
+                      onClick={() => {
                         alert(
                             `Ruta: ${route.name}\n` +
                             `Fecha: ${format(parseISO(route.date), 'dd/MM/yyyy', { locale: es })}\n` +
@@ -107,13 +123,13 @@ const CalendarView = ({ routes, onJoinRoute, onLeaveRoute, onDeleteRoute, user }
                             `Distancia: ${route.distance} km\n` +
                             `Desnivel: ${route.elevation} m\n` +
                             `Track: ${route.trackLink}\n\n` +
-                            `Participantes: ${route.participants && route.participants.length > 0 ? route.participants.join(', ') : 'Nadie apuntado'}`
+                            `Participantes: ${participantsArray.length > 0 ? participantsArray.join(', ') : 'Nadie apuntado'}`
                         );
-                    }}
-                    onDoubleClick={() => { // Doble click para apuntarse/desapuntarse
-                        if (user) { // Solo si hay un usuario logueado
-                            if (window.confirm(`¿Quieres ${route.participants.includes(user.username) ? 'desapuntarte' : 'apuntarte'} a la ruta "${route.name}"?`)) {
-                                if (route.participants.includes(user.username)) {
+                      }}
+                      onDoubleClick={() => {
+                        if (user && user.username) { // Solo si hay un usuario logueado y su username
+                            if (window.confirm(`¿Quieres ${isUserParticipant ? 'desapuntarte' : 'apuntarte'} a la ruta "${route.name}"?`)) {
+                                if (isUserParticipant) {
                                     onLeaveRoute(route.id, user);
                                 } else {
                                     onJoinRoute(route.id, user);
@@ -122,45 +138,43 @@ const CalendarView = ({ routes, onJoinRoute, onLeaveRoute, onDeleteRoute, user }
                         } else {
                             alert("Necesitas establecer un nombre de usuario para apuntarte o desapuntarte.");
                         }
-                    }}
-                  >
-                    {/* Nombre de la ruta (ahora con control de truncado) */}
-                    <span className="font-bold whitespace-nowrap overflow-hidden text-ellipsis block">
-                        {route.name}
-                    </span>
-                    {/* Hora de la ruta */}
-                    <span className="text-gray-600 block">
-                        {route.time}
-                    </span>
+                      }}
+                    >
+                      <span className="font-bold whitespace-nowrap overflow-hidden text-ellipsis block">
+                          {route.name}
+                      </span>
+                      <span className="text-gray-600 block">
+                          {route.time}
+                      </span>
 
-                    {/* Botones de acción: Visibles solo en hover del grupo, si hay usuario */}
-                    {user && (
-                        <div className="absolute inset-0 bg-blue-200 bg-opacity-75 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity p-1">
-                            {!route.participants.includes(user.username) ? (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onJoinRoute(route.id, user); }}
-                                    className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs mx-1"
-                                >
-                                    Apuntarse
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onLeaveRoute(route.id, user); }}
-                                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs mx-1"
-                                >
-                                    Desapuntarse
-                                </button>
-                            )}
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onDeleteRoute(route.id); }}
-                                className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs mx-1"
-                            >
-                                Borrar
-                            </button>
-                        </div>
-                    )}
-                  </div>
-                ))}
+                      {user && user.username && ( // Solo mostrar botones si hay un usuario
+                          <div className="absolute inset-0 bg-blue-200 bg-opacity-75 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                              {!isUserParticipant ? (
+                                  <button
+                                      onClick={(e) => { e.stopPropagation(); onJoinRoute(route.id, user); }}
+                                      className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs mx-1"
+                                  >
+                                      Apuntarse
+                                  </button>
+                              ) : (
+                                  <button
+                                      onClick={(e) => { e.stopPropagation(); onLeaveRoute(route.id, user); }}
+                                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs mx-1"
+                                  >
+                                      Desapuntarse
+                                  </button>
+                              )}
+                              <button
+                                  onClick={(e) => { e.stopPropagation(); onDeleteRoute(route.id); }}
+                                  className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs mx-1"
+                              >
+                                  Borrar
+                              </button>
+                          </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
