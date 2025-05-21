@@ -67,7 +67,11 @@ class Route(SQLModel, table=True):
 
 # Función para crear las tablas en la base de datos
 def create_db_and_tables():
+    # ¡¡¡CUIDADO!!! Esta línea es TEMPORAL y borrará todas las tablas y sus datos.
+    # Solo la usamos para forzar una actualización del esquema en Render.
+    SQLModel.metadata.drop_all(engine) # <<-- AÑADE ESTA LÍNEA AQUÍ
     SQLModel.metadata.create_all(engine)
+    print("Database tables dropped and recreated with latest schema.") # Mensaje útil para los logs de Render
 
 # Dependencia para obtener la sesión de la base de datos
 def get_session():
