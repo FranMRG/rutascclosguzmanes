@@ -45,6 +45,7 @@ class Route(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     date: str # Formato YYYY-MM-DD
+    time: str  # <<-- ¡NUEVO CAMPO: Formato HH:MM o HH:MM:SS!
     type: str # "carretera" o "gravel"
     distance: int
     elevation: int
@@ -95,6 +96,7 @@ async def create_route(route: Route, session: Session = Depends(get_session)):
     new_route = Route(
         name=route.name,
         date=route.date,
+        time=route.time,
         type=route.type,
         distance=route.distance,
         elevation=route.elevation,
