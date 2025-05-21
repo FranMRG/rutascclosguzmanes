@@ -1,22 +1,33 @@
-// src/components/RouteTabs.js
+// guzmanes-frontend/src/components/RouteTabs.js
 import React, { useState } from 'react';
 import CalendarView from './CalendarView';
 import RouteCard from './RouteCard';
 
-const RouteTabs = ({ routes = [], onDelete, onJoin, onLeave }) => {
+// Asegúrate de que RouteTabs recibe la prop 'user' además de las otras
+const RouteTabs = ({ routes = [], onDelete, onJoin, onLeave, user }) => { // <<-- ¡MODIFICADO AQUÍ!
   const [activeTab, setActiveTab] = useState('upcoming');
   const today = new Date().toISOString().split('T')[0];
 
   const upcomingRoutes = Array.isArray(routes)
     ? [...routes]
         .filter(route => route.date >= today)
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .sort((a, b) => {
+            // Ordenar primero por fecha y luego por hora
+            const dateA = new Date(a.date + 'T' + (a.time || '00:00')); // Usa '00:00' si la hora no existe
+            const dateB = new Date(b.date + 'T' + (b.time || '00:00'));
+            return dateA.getTime() - dateB.getTime();
+        })
     : [];
 
   const pastRoutes = Array.isArray(routes)
     ? [...routes]
         .filter(route => route.date < today)
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .sort((a, b) => {
+            // Ordenar primero por fecha y luego por hora (descendente para las pasadas)
+            const dateA = new Date(a.date + 'T' + (a.time || '00:00'));
+            const dateB = new Date(b.date + 'T' + (b.time || '00:00'));
+            return dateB.getTime() - dateA.getTime();
+        })
     : [];
 
   return (
@@ -52,6 +63,7 @@ const RouteTabs = ({ routes = [], onDelete, onJoin, onLeave }) => {
                   onDelete={onDelete}
                   onJoin={onJoin}
                   onLeave={onLeave}
+                  user={user} // <<-- ¡PASANDO EL USUARIO A RouteCard TAMBIÉN!
                   isPast={false}
                 />
               ))}
@@ -71,6 +83,7 @@ const RouteTabs = ({ routes = [], onDelete, onJoin, onLeave }) => {
                   onDelete={onDelete}
                   onJoin={onJoin}
                   onLeave={onLeave}
+                  user={user} // <<-- ¡PASANDO EL USUARIO A RouteCard TAMBIÉN!
                   isPast={true}
                 />
               ))}
@@ -80,7 +93,15 @@ const RouteTabs = ({ routes = [], onDelete, onJoin, onLeave }) => {
           )
         )}
 
-        {activeTab === 'calendar' && <CalendarView routes={Array.isArray(routes) ? routes : []} />}
+        {activeTab === 'calendar' && (
+          <CalendarView
+            routes={Array.isArray(routes) ? routes : []}
+            onDeleteRoute={onDelete} // <<-- ¡PASANDO PROPS A CALENDARVIEW!
+            onJoinRoute={onJoin}     // <<-- ¡PASANDO PROPS A CALENDARVIEW!
+            onLeaveRoute={onLeave}   // <<-- ¡PASANDO PROPS A CALENDARVIEW!
+            user={user}              // <<-- ¡PASANDO PROPS A CALENDARVIEW!
+          />
+        )}
       </div>
     </div>
   );

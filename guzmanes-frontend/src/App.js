@@ -70,6 +70,7 @@ const App = () => {
           onDelete={handleDeleteRoute}
           onJoin={handleJoinRoute}
           onLeave={handleLeaveRoute}
+          user={currentUser}
         />
         <Footer />
       </div>

@@ -1,10 +1,11 @@
-// src/components/RouteForm.js
+// guzmanes-frontend/src/components/RouteForm.js
 import React, { useState } from 'react';
 
 const RouteForm = ({ onAddRoute }) => {
   const [routeData, setRouteData] = useState({
     name: '',
     date: '',
+    time: '09:00', // <<-- ¡AÑADIDO: Valor por defecto para la hora!
     type: 'carretera',
     distance: '',
     elevation: '',
@@ -18,10 +19,11 @@ const RouteForm = ({ onAddRoute }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onAddRoute(routeData);
-    setRouteData({
+    onAddRoute(routeData); // Envía los datos con la hora
+    setRouteData({ // Resetea el formulario después de enviar
       name: '',
       date: '',
+      time: '09:00', // Resetea la hora también
       type: 'carretera',
       distance: '',
       elevation: '',
@@ -55,6 +57,19 @@ const RouteForm = ({ onAddRoute }) => {
             required
           />
         </div>
+        {/* <<-- ¡NUEVO CAMPO DE HORA AQUÍ! -->> */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Hora</label>
+          <input
+            type="time" // Tipo 'time' para un selector de hora
+            name="time"
+            value={routeData.time}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          />
+        </div>
+        {/* <<-- FIN CAMPO HORA -->> */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700">Tipo de ruta</label>
           <select
