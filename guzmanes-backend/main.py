@@ -1,26 +1,32 @@
 # main.py
 from fastapi import FastAPI, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware # <<-- ¡ASEGÚRATE DE AÑADIR ESTA LÍNEA!
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import json
 
 app = FastAPI()
 
-# Configuración de CORS para permitir solicitudes desde tu frontend
+# --- Configuración de CORS ---
+# Esta sección DEBE ir después de 'app = FastAPI()'
+# y antes de tus rutas (@app.get, @app.post, etc.)
 origins = [
-    "http://localhost:3000", # Para React en desarrollo
-    "http://127.0.0.1:3000", # Para React en desarrollo
-    # Agrega aquí cualquier otra URL donde se despliegue tu frontend
+    "http://localhost:3000",          # Para tu desarrollo local (React)
+    "http://127.0.0.1:3000",          # Para tu desarrollo local (React)
+    "https://rutascclosguzmanes.netlify.app", # ¡¡¡AÑADE ESTA LÍNEA ESENCIAL PARA TU FRONTEND!!!
+    "https://guzmanes-backend.onrender.com", # Buena práctica: incluir tu propio dominio de backend
+    # Agrega aquí cualquier otra URL donde se despliegue tu frontend en el futuro
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"], # Permite todos los métodos (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"], # Permite todos los encabezados
+    allow_origins=origins,          # Permitir solo los orígenes especificados
+    allow_credentials=True,         # Permitir credenciales (cookies, encabezados de autorización)
+    allow_methods=["*"],            # Permitir todos los métodos (GET, POST, PUT, DELETE, OPTIONS)
+    allow_headers=["*"],            # Permitir todos los encabezados
 )
+# --- FIN Configuración de CORS ---
+
 
 # Base de datos en memoria (para simular, reemplazar con una base de datos real si es necesario)
 # Almacenaremos los participantes como una cadena JSON en 'participants_json'
@@ -42,7 +48,6 @@ class Route(BaseModel):
     distance: int
     elevation: int
     trackLink: str
-    # ¡CAMBIO CLAVE AQUÍ! Ahora 'participants' es una lista de strings
     participants: List[str] = Field(default_factory=list)
 
 # Función auxiliar para convertir el formato de la DB a la Pydantic model
@@ -80,8 +85,7 @@ def _route_pydantic_to_db(route: Route) -> Dict[str, Any]:
         "distance": route.distance,
         "elevation": route.elevation,
         "trackLink": route.trackLink,
-        # ¡CAMBIO CLAVE AQUÍ! Serializa la lista 'participants' a una cadena JSON
-        "participants_json": json.dumps(route.participants)
+        "participants_json": json.dumps(route.participants) # Serializa la lista 'participants' a una cadena JSON
     }
 
 # Endpoints para Rutas
@@ -90,7 +94,6 @@ async def get_all_routes():
     """
     Obtiene todas las rutas.
     """
-    # Convierte los datos de la DB al modelo Pydantic Route
     return [_route_db_to_pydantic(r) for r in db_routes]
 
 @app.post("/routes", response_model=Route, status_code=status.HTTP_201_CREATED)
@@ -100,7 +103,6 @@ async def create_route(route: Route):
     """
     global route_id_counter
     route_id_counter += 1
-    # Asegúrate de que la ruta tenga un ID y los participantes iniciales
     new_route_data = _route_pydantic_to_db(Route(
         id=route_id_counter,
         name=route.name,
@@ -112,7 +114,6 @@ async def create_route(route: Route):
         participants=[] # Inicializa la lista de participantes vacía
     ))
     db_routes.append(new_route_data)
-    # Devuelve la ruta creada con el formato Pydantic correcto
     return _route_db_to_pydantic(new_route_data)
 
 @app.delete("/routes/{route_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -134,13 +135,11 @@ async def join_route(route_id: int, user: User):
     """
     for i, r_data in enumerate(db_routes):
         if r_data['id'] == route_id:
-            # Convertir de DB a Pydantic
             route = _route_db_to_pydantic(r_data)
             if user.username not in route.participants:
                 route.participants.append(user.username)
-                # Convertir de Pydantic a DB y actualizar
                 db_routes[i] = _route_pydantic_to_db(route)
-            return _route_db_to_pydantic(db_routes[i]) # Devuelve la ruta actualizada
+            return _route_db_to_pydantic(db_routes[i])
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found")
 
 @app.post("/routes/{route_id}/leave", response_model=Route)
@@ -150,13 +149,11 @@ async def leave_route(route_id: int, user: User):
     """
     for i, r_data in enumerate(db_routes):
         if r_data['id'] == route_id:
-            # Convertir de DB a Pydantic
             route = _route_db_to_pydantic(r_data)
             if user.username in route.participants:
                 route.participants.remove(user.username)
-                # Convertir de Pydantic a DB y actualizar
                 db_routes[i] = _route_pydantic_to_db(route)
-            return _route_db_to_pydantic(db_routes[i]) # Devuelve la ruta actualizada
+            return _route_db_to_pydantic(db_routes[i])
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found")
 
 # Endpoints para Usuarios (para sincronizar el usuario actual)
