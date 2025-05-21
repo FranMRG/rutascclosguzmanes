@@ -1,5 +1,5 @@
 // guzmanes-frontend/src/utils/api.js
-const BASE_URL = 'http://127.0.0.1:8000'; // ¡ASEGÚRATE DE QUE ESTA ES LA URL DE TU BACKEND!
+const BASE_URL = 'https://guzmanes-backend.onrender.com'; // ¡ASEGÚRATE DE QUE ESTA ES LA URL DE TU BACKEND!
 
 export const syncRoutes = async (routes) => {
   // Esta función parece que no se usa directamente para añadir,
