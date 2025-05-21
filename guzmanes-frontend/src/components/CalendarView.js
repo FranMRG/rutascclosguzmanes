@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 // Importa las funciones necesarias de date-fns, si no las tienes ya (format, parseISO)
 // Aunque tu implementación actual no las usa para los días, sí son útiles para formatear la hora/fecha de las rutas
 import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale'; // Para formatear fechas en español
+import { es } from 'date-fns/locale/es'; // <<-- ¡MODIFICADO AQUÍ!
 
 const months = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
