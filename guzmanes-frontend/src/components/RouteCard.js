@@ -7,6 +7,27 @@ const RouteCard = ({ route, onDelete, onJoin, onLeave, isPast }) => {
   const today = new Date().toISOString().split('T')[0];
   const isCompleted = isPast || route.date < today;
 
+  // --- MODIFICACIÓN IMPORTANTE AQUÍ ---
+  // Asegurarse de que currentParticipants sea siempre un array
+  let currentParticipants = [];
+  if (route.participants_json) {
+    try {
+      currentParticipants = JSON.parse(route.participants_json);
+      // Asegurarse de que el resultado del parseo sea un array
+      if (!Array.isArray(currentParticipants)) {
+        currentParticipants = [];
+      }
+    } catch (error) {
+      console.error("Error parsing participants_json:", error, route.participants_json);
+      currentParticipants = []; // En caso de error de parseo, se usa un array vacío
+    }
+  } else if (route.participants && Array.isArray(route.participants)) {
+    // Esto es un fallback por si route.participants ya fuera un array (menos probable con el backend actual)
+    currentParticipants = route.participants;
+  }
+  // --- FIN MODIFICACIÓN ---
+
+
   const handleDelete = async () => {
     if (password === '123admin') {
       await onDelete(route.id);
@@ -97,9 +118,10 @@ const RouteCard = ({ route, onDelete, onJoin, onLeave, isPast }) => {
           </div>
         )}
 
-        {route.participants && Array.isArray(route.participants) && route.participants.length > 0 && (
+        {/* ¡¡¡USANDO currentParticipants AQUÍ!!! */}
+        {currentParticipants && currentParticipants.length > 0 && (
           <div className="mt-3">
-            <p className="text-sm text-gray-500">Participantes: {route.participants.join(', ')}</p>
+            <p className="text-sm text-gray-500">Participantes: {currentParticipants.join(', ')}</p>
           </div>
         )}
       </div>
