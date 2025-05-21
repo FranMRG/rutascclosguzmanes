@@ -1,169 +1,171 @@
-# main.py
-from fastapi import FastAPI, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware # <<-- ¡ASEGÚRATE DE AÑADIR ESTA LÍNEA!
-from pydantic import BaseModel, Field
+# guzmanes-backend/main.py
+
+from fastapi import FastAPI, HTTPException, status, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any, Optional
 import json
 
-app = FastAPI()
+from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 # --- Configuración de CORS ---
-# Esta sección DEBE ir después de 'app = FastAPI()'
-# y antes de tus rutas (@app.get, @app.post, etc.)
 origins = [
-    "http://localhost:3000",          # Para tu desarrollo local (React)
-    "http://127.0.0.1:3000",          # Para tu desarrollo local (React)
-    "https://rutascclosguzmanes.netlify.app", # ¡¡¡AÑADE ESTA LÍNEA ESENCIAL PARA TU FRONTEND!!!
-    "https://guzmanes-backend.onrender.com", # Buena práctica: incluir tu propio dominio de backend
-    # Agrega aquí cualquier otra URL donde se despliegue tu frontend en el futuro
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://rutascclosguzmanes.netlify.app", # Tu frontend desplegado
+    "https://guzmanes-backend.onrender.com", # Tu propio dominio de backend
 ]
+
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,          # Permitir solo los orígenes especificados
-    allow_credentials=True,         # Permitir credenciales (cookies, encabezados de autorización)
-    allow_methods=["*"],            # Permitir todos los métodos (GET, POST, PUT, DELETE, OPTIONS)
-    allow_headers=["*"],            # Permitir todos los encabezados
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 # --- FIN Configuración de CORS ---
 
 
-# Base de datos en memoria (para simular, reemplazar con una base de datos real si es necesario)
-# Almacenaremos los participantes como una cadena JSON en 'participants_json'
-# id_counter se usará para asignar IDs únicos a las rutas
-db_routes = []
-db_users = {} # {username: UserObject}
-route_id_counter = 0
-user_id_counter = 0
+# --- Configuración de la Base de Datos PostgreSQL ---
+# ¡¡¡IMPORTANTE!!! Aquí usamos directamente tu URL de base de datos de Render.
+# La he convertido de 'postgresql://' a 'postgresql://' porque SQLModel/SQLAlchemy
+# requieren 'postgresql' como el nombre del driver.
+SQLALCHEMY_DATABASE_URL = "postgresql://guzmanes_db_user:lBR00fbojPdRX9q1rOnPzXCtfwdLyK11@dpg-d0n4cv95pdvs7389hmrg-a.frankfurt-postgres.render.com/guzmanes_db"
 
-class User(BaseModel):
-    id: Optional[int] = None
-    username: str
+engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=True) # echo=True para ver las queries SQL en los logs
 
-class Route(BaseModel):
-    id: Optional[int] = None
+
+# Modelos (AHORA HEREDAN DE SQLModel para ser tablas de BD)
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(index=True, unique=True)
+
+class Route(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     date: str # Formato YYYY-MM-DD
     type: str # "carretera" o "gravel"
     distance: int
     elevation: int
     trackLink: str
-    participants: List[str] = Field(default_factory=list)
+    # Los participantes se manejarán como una cadena JSON en la base de datos
+    participants_json: str = Field(default="[]")
 
-# Función auxiliar para convertir el formato de la DB a la Pydantic model
-def _route_db_to_pydantic(route_data: Dict[str, Any]) -> Route:
-    # Asegurarse de que participants_json existe y es una cadena, luego parsearla
-    participants = []
-    if 'participants_json' in route_data and isinstance(route_data['participants_json'], str):
+    @property
+    def participants(self) -> List[str]:
         try:
-            participants = json.loads(route_data['participants_json'])
+            return json.loads(self.participants_json)
         except json.JSONDecodeError:
-            print(f"Warning: Could not decode participants_json for route {route_data.get('id')}: {route_data['participants_json']}")
-            participants = [] # Default to empty list on error
-    elif 'participants' in route_data and isinstance(route_data['participants'], list):
-        # Si ya viene como lista (e.g. al crear), úsala directamente
-        participants = route_data['participants']
+            return []
 
-    return Route(
-        id=route_data.get('id'),
-        name=route_data['name'],
-        date=route_data['date'],
-        type=route_data['type'],
-        distance=route_data['distance'],
-        elevation=route_data['elevation'],
-        trackLink=route_data['trackLink'],
-        participants=participants # Asigna la lista parseada
-    )
+    @participants.setter
+    def participants(self, value: List[str]):
+        self.participants_json = json.dumps(value)
 
-# Función auxiliar para convertir el formato de la Pydantic model a la DB
-def _route_pydantic_to_db(route: Route) -> Dict[str, Any]:
-    return {
-        "id": route.id,
-        "name": route.name,
-        "date": route.date,
-        "type": route.type,
-        "distance": route.distance,
-        "elevation": route.elevation,
-        "trackLink": route.trackLink,
-        "participants_json": json.dumps(route.participants) # Serializa la lista 'participants' a una cadena JSON
-    }
+
+# Función para crear las tablas en la base de datos
+def create_db_and_tables():
+    SQLModel.metadata.create_all(engine)
+
+# Dependencia para obtener la sesión de la base de datos
+def get_session():
+    with Session(engine) as session:
+        yield session
+
+# Evento de inicio de la aplicación: crear tablas
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
 
 # Endpoints para Rutas
 @app.get("/routes", response_model=List[Route])
-async def get_all_routes():
+async def get_all_routes(session: Session = Depends(get_session)):
     """
     Obtiene todas las rutas.
     """
-    return [_route_db_to_pydantic(r) for r in db_routes]
+    routes = session.exec(select(Route)).all()
+    return routes
 
 @app.post("/routes", response_model=Route, status_code=status.HTTP_201_CREATED)
-async def create_route(route: Route):
+async def create_route(route: Route, session: Session = Depends(get_session)):
     """
     Crea una nueva ruta.
     """
-    global route_id_counter
-    route_id_counter += 1
-    new_route_data = _route_pydantic_to_db(Route(
-        id=route_id_counter,
+    new_route = Route(
         name=route.name,
         date=route.date,
         type=route.type,
         distance=route.distance,
         elevation=route.elevation,
         trackLink=route.trackLink,
-        participants=[] # Inicializa la lista de participantes vacía
-    ))
-    db_routes.append(new_route_data)
-    return _route_db_to_pydantic(new_route_data)
+        participants=[]
+    )
+    session.add(new_route)
+    session.commit()
+    session.refresh(new_route)
+    return new_route
 
 @app.delete("/routes/{route_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_route(route_id: int):
+async def delete_route(route_id: int, session: Session = Depends(get_session)):
     """
     Borra una ruta por su ID.
     """
-    global db_routes
-    initial_len = len(db_routes)
-    db_routes = [r for r in db_routes if r['id'] != route_id]
-    if len(db_routes) == initial_len:
+    route = session.get(Route, route_id)
+    if not route:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found")
-    return {"message": "Route deleted successfully"}
+    session.delete(route)
+    session.commit()
+    return
 
 @app.post("/routes/{route_id}/join", response_model=Route)
-async def join_route(route_id: int, user: User):
+async def join_route(route_id: int, user: User, session: Session = Depends(get_session)):
     """
     Permite a un usuario apuntarse a una ruta.
     """
-    for i, r_data in enumerate(db_routes):
-        if r_data['id'] == route_id:
-            route = _route_db_to_pydantic(r_data)
-            if user.username not in route.participants:
-                route.participants.append(user.username)
-                db_routes[i] = _route_pydantic_to_db(route)
-            return _route_db_to_pydantic(db_routes[i])
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found")
+    route = session.get(Route, route_id)
+    if not route:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found")
+
+    participants_list = route.participants
+    if user.username not in participants_list:
+        participants_list.append(user.username)
+        route.participants = participants_list
+        session.add(route)
+        session.commit()
+        session.refresh(route)
+    return route
 
 @app.post("/routes/{route_id}/leave", response_model=Route)
-async def leave_route(route_id: int, user: User):
+async def leave_route(route_id: int, user: User, session: Session = Depends(get_session)):
     """
     Permite a un usuario borrarse de una ruta.
     """
-    for i, r_data in enumerate(db_routes):
-        if r_data['id'] == route_id:
-            route = _route_db_to_pydantic(r_data)
-            if user.username in route.participants:
-                route.participants.remove(user.username)
-                db_routes[i] = _route_pydantic_to_db(route)
-            return _route_db_to_pydantic(db_routes[i])
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found")
+    route = session.get(Route, route_id)
+    if not route:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found")
 
-# Endpoints para Usuarios (para sincronizar el usuario actual)
+    participants_list = route.participants
+    if user.username in participants_list:
+        participants_list.remove(user.username)
+        route.participants = participants_list
+        session.add(route)
+        session.commit()
+        session.refresh(route)
+    return route
+
+# Endpoints para Usuarios
 @app.post("/users", response_model=User)
-async def sync_user(user: User):
+async def sync_user(user: User, session: Session = Depends(get_session)):
     """
     Sincroniza un usuario con la base de datos, creándolo si no existe.
     """
-    if user.username not in db_users:
-        global user_id_counter
-        user_id_counter += 1
-        db_users[user.username] = User(id=user_id_counter, username=user.username)
-    return db_users[user.username]
+    existing_user = session.exec(select(User).where(User.username == user.username)).first()
+
+    if not existing_user:
+        new_user = User(username=user.username)
+        session.add(new_user)
+        session.commit()
+        session.refresh(new_user)
+        return new_user
+    return existing_user
