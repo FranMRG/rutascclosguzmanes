@@ -1,6 +1,7 @@
 // guzmanes-frontend/src/components/RouteCard.js
 import React, { useState } from 'react';
-import { format, parseISO } from 'date-fns'; // Necesario para parsear y formatear fechas
+import { format } from 'date-fns'; // <-- ¡¡¡SOLO format, parseISO eliminado!!!
+import { es } from 'date-fns/locale/es'; // Importa el locale español, si no lo tienes ya
 
 // Asegúrate de que onUpdate se recibe como prop
 const RouteCard = ({ route, onDelete, onJoin, onLeave, onUpdate, isPast }) => {
@@ -46,7 +47,7 @@ const RouteCard = ({ route, onDelete, onJoin, onLeave, onUpdate, isPast }) => {
     }
   };
 
-  // --- NUEVA FUNCIÓN PARA MANEJAR LA EDICIÓN ---
+  // --- FUNCIÓN PARA MANEJAR LA EDICIÓN ---
   const handleEditSubmit = async (e) => {
     e.preventDefault(); // Prevenir el envío por defecto del formulario
     if (password === '123admin') { // Misma contraseña que para borrar
@@ -58,8 +59,6 @@ const RouteCard = ({ route, onDelete, onJoin, onLeave, onUpdate, isPast }) => {
         distance: Number(editDistance), // Asegurarse de que sean números
         elevation: Number(editElevation),
         trackLink: editTrackLink,
-        // No enviamos participants_json aquí, lo gestiona el backend
-        // Ni el ID, que se pasa por la URL
       };
       await onUpdate(route.id, updatedRouteData); // Llamar a la función de App.js (onUpdate)
       setShowEditForm(false); // Ocultar el formulario después de guardar
@@ -76,14 +75,10 @@ const RouteCard = ({ route, onDelete, onJoin, onLeave, onUpdate, isPast }) => {
           <div>
             <h3 className="text-xl font-semibold text-gray-800">{route.name}</h3>
             <p className="text-gray-600">
-              {new Date(route.date).toLocaleDateString('es-ES', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
+              {/* Uso de format con el locale */}
+              {format(new Date(route.date), 'EEEE, dd MMMM yyyy', { locale: es })}
             </p>
-            <p className="text-gray-500 text-sm">Hora: {route.time}</p> {/* Añadido hora */}
+            <p className="text-gray-500 text-sm">Hora: {route.time}</p>
             <p className="text-gray-500 text-sm">Distancia: {route.distance} km</p>
             <p className="text-gray-500 text-sm">Desnivel: {route.elevation} m</p>
             {route.trackLink && (
@@ -124,11 +119,9 @@ const RouteCard = ({ route, onDelete, onJoin, onLeave, onUpdate, isPast }) => {
             <span className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded">Ruta completada</span>
           )}
 
-          {/* ¡¡¡NUEVO BOTÓN MODIFICAR!!! */}
           <button
             onClick={() => {
-              setShowEditForm(!showEditForm); // Alternar visibilidad del formulario de edición
-              // Ocultar el campo de contraseña de borrar si está abierto y limpiar la contraseña
+              setShowEditForm(!showEditForm);
               if (showPasswordField) setShowPasswordField(false);
               setPassword('');
             }}
@@ -137,11 +130,9 @@ const RouteCard = ({ route, onDelete, onJoin, onLeave, onUpdate, isPast }) => {
             {showEditForm ? 'Cancelar Edición' : 'Modificar ruta'}
           </button>
 
-          {/* Botón de Borrar Ruta */}
           <button
             onClick={() => {
-              setShowPasswordField(!showPasswordField); // Alternar visibilidad del campo de contraseña de borrar
-              // Ocultar el formulario de edición si está abierto y limpiar la contraseña
+              setShowPasswordField(!showPasswordField);
               if (showEditForm) setShowEditForm(false);
               setPassword('');
             }}
@@ -151,12 +142,10 @@ const RouteCard = ({ route, onDelete, onJoin, onLeave, onUpdate, isPast }) => {
           </button>
         </div>
 
-        {/* Formulario de edición (visible cuando showEditForm es true) */}
         {showEditForm && (
           <form onSubmit={handleEditSubmit} className="mt-4 p-3 bg-gray-50 rounded-md border border-gray-200">
             <h4 className="text-lg font-semibold mb-3 text-gray-700">Modificar Ruta</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Campos del formulario, similares a RouteForm */}
               <label className="block">
                 <span className="text-gray-700 text-sm">Nombre:</span>
                 <input
@@ -253,7 +242,6 @@ const RouteCard = ({ route, onDelete, onJoin, onLeave, onUpdate, isPast }) => {
           </form>
         )}
 
-        {/* Campo de contraseña para borrar (visible cuando showPasswordField es true) */}
         {showPasswordField && (
           <div className="mt-3">
             <input
