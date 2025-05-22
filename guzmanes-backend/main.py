@@ -1,6 +1,6 @@
 # guzmanes-backend/main.py
 
-from fastapi import FastAPI, HTTPException, status, Depends
+from fastapi import FastAPI, HTTPException, status, Depends # <-- Asegúrate de que Depends está importado
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any, Optional
 import json
@@ -45,11 +45,11 @@ class Route(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     date: str # Formato YYYY-MM-DD
-    time: str  # <<-- ¡NUEVO CAMPO: Formato HH:MM o HH:MM:SS!
+    time: str  # Formato HH:MM o HH:MM:SS
     type: str # "carretera" o "gravel"
     distance: int
     elevation: int
-    trackLink: str
+    trackLink: Optional[str] = None # Hacemos trackLink opcional para ser coherentes
     # Los participantes se manejarán como una cadena JSON en la base de datos
     participants_json: str = Field(default="[]")
 
@@ -67,10 +67,10 @@ class Route(SQLModel, table=True):
 
 # Función para crear las tablas en la base de datos
 def create_db_and_tables():
-    # ¡¡¡CUIDADO!!! Esta línea es TEMPORAL y borrará todas las tablas y sus datos.
-    # Solo la usamos para forzar una actualización del esquema en Render.
+    # ¡¡¡IMPORTANTE!!! Ya no borramos la base de datos al iniciar.
+    # SQLModel.metadata.drop_all(engine) # ¡¡¡ELIMINADA!!!
     SQLModel.metadata.create_all(engine)
-    print("Database tables dropped and recreated with latest schema.") # Mensaje útil para los logs de Render
+    print("Database tables created if not existing.") # Mensaje útil para los logs de Render
 
 # Dependencia para obtener la sesión de la base de datos
 def get_session():
@@ -104,7 +104,7 @@ async def create_route(route: Route, session: Session = Depends(get_session)):
         distance=route.distance,
         elevation=route.elevation,
         trackLink=route.trackLink,
-        participants=[]
+        participants=[] # Se inicializa vacío, el setter lo convertirá a JSON
     )
     session.add(new_route)
     session.commit()
@@ -122,6 +122,36 @@ async def delete_route(route_id: int, session: Session = Depends(get_session)):
     session.delete(route)
     session.commit()
     return
+
+# Endpoint para modificar una ruta existente
+@app.put("/routes/{route_id}", response_model=Route)
+async def update_route(
+    route_id: int,
+    updated_route: Route, # Espera el objeto Route completo con los campos a actualizar
+    session: Session = Depends(get_session)
+):
+    """
+    Modifica una ruta existente por su ID.
+    """
+    route = session.get(Route, route_id)
+    if not route:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found")
+
+    # Actualiza los campos de la ruta existente con los valores del updated_route
+    # No actualizamos 'id' ni 'participants_json' directamente aquí.
+    # Los participantes se manejan con los endpoints /join y /leave.
+    route.name = updated_route.name
+    route.date = updated_route.date
+    route.time = updated_route.time
+    route.type = updated_route.type
+    route.distance = updated_route.distance
+    route.elevation = updated_route.elevation
+    route.trackLink = updated_route.trackLink
+
+    session.add(route)
+    session.commit()
+    session.refresh(route)
+    return route
 
 @app.post("/routes/{route_id}/join", response_model=Route)
 async def join_route(route_id: int, user: User, session: Session = Depends(get_session)):
