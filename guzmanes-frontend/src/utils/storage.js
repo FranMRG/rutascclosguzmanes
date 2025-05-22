@@ -1,11 +1,12 @@
 // guzmanes-frontend/src/utils/storage.js
 import {
   getRemoteRoutes as apiGetRemoteRoutes,
-  addRemoteRoute as apiAddRemoteRoute, // Importar la nueva función
+  addRemoteRoute as apiAddRemoteRoute,
   deleteRemoteRoute as apiDeleteRemoteRoute,
   syncUser as apiSyncUser,
   joinRemoteRoute as apiJoinRemoteRoute,
-  leaveRemoteRoute as apiLeaveRemoteRoute
+  leaveRemoteRoute as apiLeaveRemoteRoute,
+  updateRemoteRoute as apiUpdateRemoteRoute // <-- ¡¡¡NUEVA IMPORTACIÓN!!!
 } from './api';
 
 // Función para obtener las rutas del backend (y guardarlas localmente si lo deseas)
@@ -30,7 +31,7 @@ export const addRoute = async (newRoute) => {
     return updatedRoutes;
   } catch (error) {
     console.error('Error adding route:', error);
-    return await getRoutes(); // Intenta recargar por si hay datos parciales o error en la adición
+    return await getRoutes(); // Si falla, intenta recargar
   }
 };
 
@@ -79,6 +80,22 @@ export const getCurrentUser = () => {
 
 export const setCurrentUser = async (username) => {
   localStorage.setItem('cycling_user', username);
-  console.log("Syncing user with backend:", username);
-  await apiSyncUser(username); // Sincronizar el usuario con el backend
+  // Sincronizar el usuario con el backend
+  try {
+    await apiSyncUser(username);
+  } catch (error) {
+    console.error('Error syncing user with backend:', error);
+  }
+};
+
+// --- ¡¡¡NUEVA FUNCIÓN PARA MODIFICAR RUTA!!! ---
+export const updateRoute = async (routeId, updatedRouteData) => {
+  try {
+    await apiUpdateRemoteRoute(routeId, updatedRouteData); // Llama al backend para actualizar
+    const updatedRoutes = await getRoutes(); // Recarga TODAS las rutas para actualizar el estado
+    return updatedRoutes;
+  } catch (error) {
+    console.error('Error updating route:', error);
+    return await getRoutes(); // Intenta recargar por si hay datos parciales o error en la actualización
+  }
 };

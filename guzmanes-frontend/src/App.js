@@ -5,7 +5,15 @@ import RouteForm from './components/RouteForm';
 import RouteTabs from './components/RouteTabs';
 import Footer from './components/Footer';
 import UserSetup from './components/UserSetup';
-import { getRoutes, addRoute, deleteRoute, joinRoute, leaveRoute, setCurrentUser as setRemoteUser } from './utils/storage';
+import {
+  getRoutes,
+  addRoute,
+  deleteRoute,
+  joinRoute,
+  leaveRoute,
+  setCurrentUser as setRemoteUser,
+  updateRoute // <-- ¡¡¡NUEVA IMPORTACIÓN!!!
+} from './utils/storage';
 
 const App = () => {
   const [routes, setRoutes] = useState([]);
@@ -59,6 +67,14 @@ const App = () => {
     console.log("Rutas recargadas después de borrarse.");
   };
 
+  // --- ¡¡¡NUEVA FUNCIÓN PARA MANEJAR LA MODIFICACIÓN DE RUTA!!! ---
+  const handleUpdateRoute = async (routeId, updatedRouteData) => {
+    console.log(`Intentando actualizar la ruta ${routeId} con datos:`, updatedRouteData);
+    const updatedRoutes = await updateRoute(routeId, updatedRouteData); // Llama a la función de storage
+    setRoutes(updatedRoutes); // Actualiza el estado con las rutas recargadas
+    console.log("Rutas recargadas después de modificar.");
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
@@ -70,6 +86,7 @@ const App = () => {
           onDelete={handleDeleteRoute}
           onJoin={handleJoinRoute}
           onLeave={handleLeaveRoute}
+          onUpdate={handleUpdateRoute} // <-- ¡¡¡NUEVA PROP PARA RouteTabs!!!
           user={currentUser}
         />
         <Footer />

@@ -138,3 +138,25 @@ export const leaveRemoteRoute = async (routeId, participantObj) => {
     return null;
   }
 };
+
+// --- ¡¡¡NUEVA FUNCIÓN PARA MODIFICAR RUTA!!! ---
+export const updateRemoteRoute = async (routeId, updatedRouteData) => {
+  try {
+    const response = await fetch(`${BASE_URL}/routes/${routeId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updatedRouteData),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log(`Ruta ${routeId} actualizada remotamente:`, data);
+    return data; // Devuelve la ruta actualizada
+  } catch (error) {
+    console.error('Update remote route error:', error);
+    return null;
+  }
+};
